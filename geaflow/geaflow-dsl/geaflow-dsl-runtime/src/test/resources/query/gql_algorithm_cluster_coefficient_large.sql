@@ -17,17 +17,44 @@
  * under the License.
  */
 
-/******************************************/
-/*   TableName = backend_meta   */
-/******************************************/
-CREATE TABLE IF NOT EXISTS `backend_meta` (
-  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT COMMENT 'PK',
-  `pk` varchar(255) NOT NULL COMMENT 'Meta key',
-  `value` mediumblob DEFAULT NULL COMMENT 'Meta value',
-  `gmt_create` timestamp NULL DEFAULT NULL COMMENT 'Create Time',
-  `gmt_modified` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Modify Time',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_pk` (`pk`),
-  KEY `idx_gmt_modified` (`gmt_modified`)
-)  DEFAULT CHARSET = utf8mb4 COMMENT = 'GeaFlow Task Runtime Meta'
+CREATE TABLE v_large (
+  id bigint,
+  name varchar,
+  attr varchar
+) WITH (
+	type='file',
+	geaflow.dsl.window.size = -1,
+	geaflow.dsl.file.path = 'resource:///data/large_graph_vertex.txt'
+);
+
+CREATE TABLE e_large (
+  srcId bigint,
+  targetId bigint
+) WITH (
+	type='file',
+	geaflow.dsl.window.size = -1,
+	geaflow.dsl.file.path = 'resource:///data/large_graph_edge.txt'
+);
+
+CREATE GRAPH large_graph (
+	Vertex node using v_large WITH ID(id),
+	Edge link using e_large WITH ID(srcId, targetId)
+) WITH (
+	storeType='memory',
+	shardCount = 8
+);
+
+CREATE TABLE result_tb (
+   vid int,
+   coefficient double
+) WITH (
+      type='file',
+      geaflow.dsl.file.path='${target}'
+);
+
+USE GRAPH large_graph;
+
+INSERT INTO result_tb
+CALL cluster_coefficient(3) YIELD (vid, coefficient)
+RETURN cast (vid as int), coefficient
 ;
